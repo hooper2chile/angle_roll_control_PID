@@ -1,6 +1,7 @@
 
 #include   <Arduino.h>
 #include   <TimerOne.h>
+#include   <avr/wdt.h>
 #include   <PID_v1.h>
 #include   <Wire.h>
 
@@ -25,12 +26,15 @@
 #define    A         0.98
 #define    B         0.02
 
-#define    TIME_P    20        //20us <=> periodo de interrupcion
-#define    TIME_T    1000      //1000 cuentas   // 20e-3/20e-6 <=> (periodo 50 Hz)/(periodo de interrupcion)
-#define    TIME_B    TIME_T/20 //50 cuentas ó 1ms, 5% de duty cycle como base para esc.
-#define    vBASE     120.0
+#define    TIME_P    20         //20us <=> periodo de interrupcion
+#define    TIME_T    1000       //1000 cuentas   // 20e-3/20e-6 <=> (periodo 50 Hz)/(periodo de interrupcion)
+#define    TIME_B    TIME_T/20  //50 cuentas ó 1ms, 5% de duty cycle como base para esc.
 
-#define    PWM_PORT  PORTB
+#define    vBASE1    125   // linea roja,  lado derecho
+#define    vBASE2    125   // linea verde, lado izquierdo
+
+
+#define    PWM_PORT   PORTB
 #define    PIN1_      PB1
 #define    PIN2_      PB2
 #define    PIN3_      PB3
@@ -54,7 +58,8 @@ uint8_t Buf[14];
 int16_t a[3] = {0};  //ax, ay, az;
 int16_t g[3] = {0};  //gx, gy, gz;
 
-float dt         = 500;
+float mTime      = 0;
+float eTime      = 0.007;
 float coef[6]    = {0};   //Ax, Ay, Az, Gx, Gy, Gz;
 float angle[2]   = {0};   //angle_ax, angle_ay;
 float afilter[2] = {0};   //angle_x_filter, angle_y_filter;
@@ -64,7 +69,7 @@ float afilter[2] = {0};   //angle_x_filter, angle_y_filter;
 *   pid definitions for automatic control
 ***************************************************************************************/
 double setpoint, input, output;
-double kp=1.4, ki=1, kd=0.6;
+double kp=2, ki=0.5, kd=1;
 PID roll_pid(&input, &output, &setpoint, kp, ki, kd, DIRECT);
 
 
@@ -73,8 +78,7 @@ PID roll_pid(&input, &output, &setpoint, kp, ki, kd, DIRECT);
 *   i2c definitions for communication to IMU9250
 ***************************************************************************************/
 //Funcion auxiliar lectura
-inline void I2Cread(uint8_t Address, uint8_t Register, uint8_t Nbytes, uint8_t* Data)
-{
+inline void I2Cread(uint8_t Address, uint8_t Register, uint8_t Nbytes, uint8_t* Data) {
   Wire.beginTransmission(Address);
   Wire.write(Register);
   Wire.endTransmission();
@@ -83,12 +87,13 @@ inline void I2Cread(uint8_t Address, uint8_t Register, uint8_t Nbytes, uint8_t* 
   uint8_t index = 0;
   while (Wire.available())
     Data[index++] = Wire.read();
+
+  wdt_reset();
 }
 
 
 // Funcion auxiliar de escritura
-void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
-{
+void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data) {
   Wire.beginTransmission(Address);
   Wire.write(Register);
   Wire.write(Data);
@@ -96,14 +101,13 @@ void I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data)
 }
 
 
-inline float filter(float AF_Prev, float Gyro, float Angle)
-{
-  return ( A*(AF_Prev + Gyro*(dt*us)) + B*Angle );
+inline float filter(float AF_Prev, float Gyro, float Angle) {
+  return ( A*(AF_Prev + Gyro*eTime) + B*Angle );
+
 }
 
 
-void raw_values()
-{ //accelerometer
+void raw_values() { //accelerometer
   a[0] = - (Buf[0] << 8 | Buf[1]);
   a[1] = - (Buf[2] << 8 | Buf[3]);
   a[2] = + (Buf[4] << 8 | Buf[5]);
@@ -128,15 +132,15 @@ void raw_values()
 }
 
 
-void info()
-{// --- Mostrar valores  ---
-  Serial.print(afilter[0]);
+void info() {// --- Mostrar valores  ---
+  Serial.print(afilter[0]);     //azul
   Serial.print("\t");
-  Serial.print((int8_t) output);
+  Serial.print(output);         //rojo
   Serial.print("\t");
-  Serial.print(out1);
+  Serial.print(out1);           //verde,   motor lado izquierdo
   Serial.print("\t");
-  Serial.print(out2);
+  Serial.print(out2);           //naranjo, motor lado derecho
+
   Serial.println("");
 }
 
@@ -157,14 +161,11 @@ inline void pin_updown(uint16_t *count, volatile uint16_t *dt, volatile uint8_t 
     (*count)++;
 }
 
-
 void pwm_signals() {
   //PORTB |= (1 << PB0);
-
   pin_updown(&count_m1, &dt_m1, &PWM_PORT, _BV(PIN1_));
   pin_updown(&count_m2, &dt_m2, &PWM_PORT, _BV(PIN2_));  //motor 2, ON
-  pin_updown(&count_m3, &dt_m3, &PWM_PORT, _BV(PIN3_));
-  pin_updown(&count_m4, &dt_m4, &PWM_PORT, _BV(PIN4_));
-
+  //pin_updown(&count_m3, &dt_m3, &PWM_PORT, _BV(PIN3_));
+  //pin_updown(&count_m4, &dt_m4, &PWM_PORT, _BV(PIN4_));
   //PORTB &= ~(1 << PB0);
 }
