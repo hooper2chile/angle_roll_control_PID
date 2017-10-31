@@ -26,19 +26,31 @@
 #define    A         0.98
 #define    B         0.02
 
-#define    TIME_P    20         //20us <=> periodo de interrupcion
-#define    TIME_T    1000       //1000 cuentas   // 20e-3/20e-6 <=> (periodo 50 Hz)/(periodo de interrupcion)
-#define    TIME_B    TIME_T/20  //50 cuentas ó 1ms, 5% de duty cycle como base para esc.
+#define    TIME_T    20.0      //20us <=> periodo de interrupción, FIJADO POR MI!
+#define    FREC_ESC  50.0      //50 [Hz] = Frecuencia señal pwm de control del ESC
 
-#define    vBASE1    125   // linea roja,  lado derecho
-#define    vBASE2    125   // linea verde, lado izquierdo
+#define    Kcount_T  (int)((1/FREC_ESC)/(TIME_T*us)) //K contador del periodo de base para 50 Hz, equivale a: 1000 cuentas, o: 20e-3/20e-6 <=> (periodo 50 Hz)/(periodo de interrupcion deseado)
+#define    Kcount_B  (int)(Kcount_T/TIME_T)          //K contador del tiempo minimo en alto, equivale a 50 cuentas ó 1ms, 5% de duty cycle como base para esc.
 
+#define    K_MIN1    0  //68 es el minimo comprobado, el minimo teorico = K_T/20us = 50
+#define    K_MIN2    0  //59
+
+#define    K_MAX1    50
+#define    K_MAX2    50
+
+#define    THROTTLE  68
+
+#define    UMAX       +255
+#define    UMIN       -255
+#define    Ts         2    //2 [ms]
 
 #define    PWM_PORT   PORTB
 #define    PIN1_      PB1
 #define    PIN2_      PB2
 #define    PIN3_      PB3
 #define    PIN4_      PB4
+
+
 
 uint16_t count_m1  = 0;
 uint16_t count_m2  = 0;
@@ -59,7 +71,7 @@ int16_t a[3] = {0};  //ax, ay, az;
 int16_t g[3] = {0};  //gx, gy, gz;
 
 float mTime      = 0;
-float eTime      = 0.007;
+float eTime      = 0.003;
 float coef[6]    = {0};   //Ax, Ay, Az, Gx, Gy, Gz;
 float angle[2]   = {0};   //angle_ax, angle_ay;
 float afilter[2] = {0};   //angle_x_filter, angle_y_filter;
@@ -69,7 +81,7 @@ float afilter[2] = {0};   //angle_x_filter, angle_y_filter;
 *   pid definitions for automatic control
 ***************************************************************************************/
 double setpoint, input, output;
-double kp=2, ki=0.5, kd=1;
+double kp=1.5, ki=0.2, kd=1;
 PID roll_pid(&input, &output, &setpoint, kp, ki, kd, DIRECT);
 
 
@@ -106,7 +118,6 @@ inline float filter(float AF_Prev, float Gyro, float Angle) {
 
 }
 
-
 void raw_values() { //accelerometer
   a[0] = - (Buf[0] << 8 | Buf[1]);
   a[1] = - (Buf[2] << 8 | Buf[3]);
@@ -133,14 +144,19 @@ void raw_values() { //accelerometer
 
 
 void info() {// --- Mostrar valores  ---
-  Serial.print(afilter[0]);     //azul
+  //Serial.print(afilter[0]);     //azul
+  Serial.print(input);
   Serial.print("\t");
-  Serial.print(output);         //rojo
+  Serial.print(out1);           //verde, motor lado derecho
   Serial.print("\t");
-  Serial.print(out1);           //verde,   motor lado izquierdo
+  Serial.print(out2);           //rojo,  motor lado izquierdo
+/*
   Serial.print("\t");
-  Serial.print(out2);           //naranjo, motor lado derecho
-
+  Serial.print(+270);
+  Serial.print("\t");
+  Serial.print(-270);
+  Serial.print("\t");
+*/
   Serial.println("");
 }
 
@@ -152,10 +168,10 @@ void info() {// --- Mostrar valores  ---
 inline void pin_updown(uint16_t *count, volatile uint16_t *dt, volatile uint8_t *PORT, uint8_t PIN) {
   if (*count == 0)
     *PORT |= PIN;
-  else if (*count == TIME_B + *dt )
+  else if (*count == Kcount_B + *dt )
     *PORT &= ~PIN;
 
-  if (*count == TIME_T)
+  if (*count == Kcount_T)
     *count = 0;
   else
     (*count)++;
@@ -163,7 +179,7 @@ inline void pin_updown(uint16_t *count, volatile uint16_t *dt, volatile uint8_t 
 
 void pwm_signals() {
   //PORTB |= (1 << PB0);
-  pin_updown(&count_m1, &dt_m1, &PWM_PORT, _BV(PIN1_));
+  pin_updown(&count_m1, &dt_m1, &PWM_PORT, _BV(PIN1_));  //motor 1, ON
   pin_updown(&count_m2, &dt_m2, &PWM_PORT, _BV(PIN2_));  //motor 2, ON
   //pin_updown(&count_m3, &dt_m3, &PWM_PORT, _BV(PIN3_));
   //pin_updown(&count_m4, &dt_m4, &PWM_PORT, _BV(PIN4_));

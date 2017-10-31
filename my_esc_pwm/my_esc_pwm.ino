@@ -1,8 +1,11 @@
 #include<TimerOne.h>
 
-#define TIME_P   20         //20us <=> periodo de interrupcion
-#define TIME_T   1000      //1000 cuentas   // 20e-3/20e-6 <=> (periodo 50 Hz)/(periodo de interrupcion)
-#define TIME_B   TIME_T/20  //50 cuentas ó 1ms, 5% de duty cycle como base para esc.
+#define us       1e-6
+#define FREC_B   50.0                          //50 Hz, frecuencia de la señal de comando pwm para el ESC
+#define TIME_P   20.0                          //20us <=> periodo de interrupcion
+#define TIME_T   (int)((1/FREC_B)/(TIME_P*us))  //1000 cuentas   // 20e-3/20e-6 <=> (periodo 50 Hz)/(periodo de interrupcion)
+#define TIME_B   TIME_T/20    
+
 
 #define PWM_PORT  PORTB
 #define PIN1      PB1
@@ -48,6 +51,7 @@ void pwm_signals() {
 
 
 void setup() {
+  Serial.begin(115200);
   DDRB |= (1 << PB0) | (1 << PB1) | (1 << PB2) | (1 << PB3);
   Timer1.initialize(TIME_P);
   Timer1.attachInterrupt(pwm_signals);
@@ -59,9 +63,10 @@ void loop() {
    DT1 = analogRead(A0);
    //DT2 = analogRead(A1);
    dt_m1 = map(DT1, 0, 1023, 0, TIME_B);
-   //dt_m2 = map(DT2, 0, 1023, 0, TIME_B);
+   //dt_m2 = map(DT1, 0, 1023, 0, TIME_B);
    delay(1);
-     
+
+   Serial.println(dt_m1);
 }
 
 
