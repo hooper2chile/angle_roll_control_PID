@@ -46,6 +46,11 @@ void loop()
   out1 = THROTTLE - output;   //out1: LADO DERECHO
   out2 = THROTTLE + output;   //out2: LADO IZQUIERDO
 
+  if (out1 < 0) out1 = 0;
+  else if (out1 > 255) out1 = 255;
+
+  if (out2 < 0) out2 = 0;
+  else if (out2 > 255) out2 = 255;
 
   dt_m1 = map(out1, 0, UMAX, K_MIN1, K_MAX1);
   dt_m2 = map(out2, 0, UMAX, K_MIN2, K_MAX2);

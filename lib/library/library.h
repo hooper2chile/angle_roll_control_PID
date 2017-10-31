@@ -28,7 +28,6 @@
 
 #define    TIME_T    20.0      //20us <=> periodo de interrupción, FIJADO POR MI!
 #define    FREC_ESC  50.0      //50 [Hz] = Frecuencia señal pwm de control del ESC
-
 #define    Kcount_T  (int)((1/FREC_ESC)/(TIME_T*us)) //K contador del periodo de base para 50 Hz, equivale a: 1000 cuentas, o: 20e-3/20e-6 <=> (periodo 50 Hz)/(periodo de interrupcion deseado)
 #define    Kcount_B  (int)(Kcount_T/TIME_T)          //K contador del tiempo minimo en alto, equivale a 50 cuentas ó 1ms, 5% de duty cycle como base para esc.
 
@@ -38,7 +37,7 @@
 #define    K_MAX1    50
 #define    K_MAX2    50
 
-#define    THROTTLE  68
+#define    THROTTLE  100  //VELOCIDAD BASE, ESCALA PID OUPUT
 
 #define    UMAX       +255
 #define    UMIN       -255
@@ -81,7 +80,10 @@ float afilter[2] = {0};   //angle_x_filter, angle_y_filter;
 *   pid definitions for automatic control
 ***************************************************************************************/
 double setpoint, input, output;
-double kp=1.5, ki=0.2, kd=1;
+//double kp=1.8, ki=0.75, kd=0.5;
+//double kp=1.5, ki=0.2, kd=1;
+//double kp=3, ki=1, kd=0.7;
+double kp=2, ki=1, kd=0.7;
 PID roll_pid(&input, &output, &setpoint, kp, ki, kd, DIRECT);
 
 
@@ -146,11 +148,12 @@ void raw_values() { //accelerometer
 void info() {// --- Mostrar valores  ---
   //Serial.print(afilter[0]);     //azul
   Serial.print(input);
+/*
   Serial.print("\t");
   Serial.print(out1);           //verde, motor lado derecho
   Serial.print("\t");
   Serial.print(out2);           //rojo,  motor lado izquierdo
-/*
+
   Serial.print("\t");
   Serial.print(+270);
   Serial.print("\t");
